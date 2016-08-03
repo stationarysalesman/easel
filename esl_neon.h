@@ -218,11 +218,16 @@ esl_neon_any_gt_float(esl_neon_128f_t a, esl_neon_128f_t b)
 static inline void
 esl_neon_hsum_float(esl_neon_128f_t a, float *ret_sum)
 {
+
+#if defined HAVE_ARM64
+  *ret_sum = vaddvq_f32(a.f32x4);
+#else
   esl_neon_128f_t fvec;  
   a.f32x4    = vaddq_f32(a.f32x4, vrev64q_f32(a.f32x4));
   fvec.f32x4 = vextq_f32(a.f32x4, a.f32x4, 2);
   a.f32x4    = vaddq_f32(a.f32x4, fvec.f32x4);
   vst1q_lane_f32(ret_sum, a.f32x4, 0);
+#endif
 }
 
 
@@ -297,6 +302,9 @@ esl_neon_any_gt_s16(esl_neon_128i_t a, esl_neon_128i_t b)
 static inline uint8_t
 esl_neon_hmax_u8(esl_neon_128i_t a)
 {
+  #if defined HAVE_ARM64
+  return vmaxvq_u8(a.u8x16);
+  #else
   register esl_neon_128i_t tempv;
 
   tempv.u8x16 = vreinterpretq_u8_u32(vextq_u32(a.u32x4, a.u32x4, 2));
@@ -309,6 +317,7 @@ esl_neon_hmax_u8(esl_neon_128i_t a)
   a.u8x16     = vmaxq_u8(a.u8x16, tempv.u8x16);
 
   return vgetq_lane_u8(a.u8x16, 15);
+  #endif
 }
 
 /* Function:  esl_neon_hmax_s16()
@@ -320,10 +329,14 @@ esl_neon_hmax_u8(esl_neon_128i_t a)
 static inline int16_t
 esl_neon_hmax_s16(esl_neon_128i_t a)
 {
+  #if defined HAVE_ARM64
+  return vmaxvq_s16(a.s16x8);
+  #else
   a.s16x8 = vmaxq_s16(a.s16x8, vrev64q_s16(a.s16x8));
   a.s16x8 = vmaxq_s16(a.s16x8, vreinterpretq_s16_s32(vrev64q_s32(a.s32x4)));
   a.s16x8 = vmaxq_s16(a.s16x8, vreinterpretq_s16_s32(vextq_s32(a.s32x4, a.s32x4, 2)));
   return vgetq_lane_s16(a.s16x8, 7);
+  #endif
 }
 
 #endif /* eslNEON_INCLUDED */

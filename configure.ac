@@ -115,7 +115,15 @@ AC_DEFINE_UNQUOTED(EASEL_VERSION,   "$EASEL_VERSION")
 #       host_vendor     example: pc
 #       host_os         example: linux-gnu
 AC_CANONICAL_HOST
-
+case $host in
+    ia64-*-*)      host_platform=intel;;
+    i?86-*-*)      host_platform=intel;;
+    x86*-*-*)      host_platform=intel;;
+    arm*-*-*)      host_platform=arm;;
+    aarch64*-*-*) host_platform=arm64;;
+    powerpc*-*-*)  host_platform=power;;
+    *)             AC_MSG_WARN([host_platform unrecognized (not intel, power, arm...)]);;
+esac
 
 
 ################################################################
@@ -381,14 +389,23 @@ fi
   AC_SUBST(AVX512_CFLAGS)
 
 # ARM and NEON SIMD flags
-if test "$enable_neon" = "yes" || test "$enable_neon" = "check"; then
+if test "$host_platform" != "arm64"  && (test "$enable_neon" = "yes" || test "$enable_neon" = "check"); then
    if test "x$SIMD_CFLAGS" = x; then
      case $ax_cv_c_compiler_vendor in
        gnu)   AX_CHECK_COMPILER_FLAGS(-mfpu=neon,[ARM_CFLAGS="-mfpu=neon"],[]);;
        *)     ;;
      esac   
    fi
-fi
+
+else 
+   if test "$host_platform" = "arm64" && test "x$SIMD_CFLAGS" = x; then
+       case $ax_cv_c_compiler_vendor in
+         gnu)   AX_CHECK_COMPILER_FLAGS(-march=armv8-a, [ARM_CFLAGS="-march=armv8-a"], []);;
+         *)     ;;
+       esac
+     fi
+   fi
+
 if test "$enable_neon" = "check"; then
    sre_save_CFLAGS="$CFLAGS"
    sre_save_CPPFLAGS="$CPPFLAGS"
@@ -406,6 +423,9 @@ if test "$enable_neon" = "check"; then
 fi
 if test "$enable_neon" = "yes"; then
    AC_DEFINE(HAVE_NEON,1,[Support NEON instructions])
+   if test "$host_platform" = "arm64"; then
+      AC_DEFINE(HAVE_ARM64,1,[AArch64 target])
+   fi
 fi
 
 
@@ -419,7 +439,7 @@ fi
 # cominations of NEON/VFP compiler options. This allows 
 # us to determine the best compile options for each 
 # ARM architecture. 
-if test "$enable_neon" = "yes"; then
+if test "$enable_neon" = "yes" && test "$host_platform" != "arm64"; then
   cortex_a5="-mfpu=neon-fp16"
   cortex_a7="-mfpu=neon-vfpv4"
   cortex_a8="-mfpu=neon"
@@ -452,13 +472,42 @@ if test "$enable_neon" = "yes"; then
   CPPFLAGS="$sre_save_CPPFLAGS"
 
 else
-   if test "x$SIMD_CFLAGS" = x; then
+   if test "x$SIMD_CFLAGS" = x && test "$host_platform" != "arm64"; then
      case $ax_cv_c_compiler_vendor in
        gnu)   AX_CHECK_COMPILER_FLAGS(-mfpu=neon,[SIMD_CFLAGS="-mfpu=neon"],
                [AC_MSG_WARN([no NEON hardware detected])]);;
        *)     ;;
        esac
    fi
+fi
+
+
+if test "$enable_neon" = "yes" && test "$host_platform" = "arm64"; then
+  cortex_a53="-march=armv8-a -mcpu=cortex-a53"
+  cortex_a57="-march=armv8-a -mcpu=cortex-a57"
+  cortex_a72="-march=armv8-a -mcpu=cortex-a72"
+  cortex_a73="-march=armv8-a -mcpu=cortex-a73"
+  sre_save_CFLAGS="$CFLAGS"
+  sre_save_CPPFLAGS="$CPPFLAGS"
+  CFLAGS="$CFLAGS $cortex_a53"
+  CPPFLAGS="$CPPFLAGS $cortex_a53"
+  AC_RUN_IFELSE([AC_LANG_PROGRAM( [[]],[[int a = 32;]])],
+                    [vector_flags="$cortex_a53"], [])
+  CFLAGS="$sre_save_CFLAGS $cortex_a57"
+  CPPFLAGS="$sre_save_CPPFLAGS $cortex_a57"
+  AC_RUN_IFELSE([AC_LANG_PROGRAM( [[]],[[int a = 32;]])],
+                    [vector_flags="$cortex_a57"], [])
+  CFLAGS="$sre_save_CFLAGS $cortex_a72"
+  CPPFLAGS="$sre_save_CPPFLAGS $cortex_a72"
+  AC_RUN_IFELSE([AC_LANG_PROGRAM( [[]],[[int a = 32;]])],
+                    [vector_flags="$cortex_a72"], [])
+  CFLAGS="$sre_save_CFLAGS $cortex_a73"
+  CPPFLAGS="$sre_save_CPPFLAGS $cortex_a73"
+  AC_RUN_IFELSE([AC_LANG_PROGRAM( [[]],[[int a = 32;]])],
+                    [vector_flags="$cortex_a73"], [])
+  
+  CFLAGS="$sre_save_CFLAGS"
+  CPPFLAGS="$sre_save_CPPFLAGS"
 fi
 
 if test "y$vector_flags" != "y"; then
