@@ -80,7 +80,7 @@
  *            Pommier. Added handling of IEEE754 specials.
  */
 esl_neon_128f_t esl_neon_logf(esl_neon_128f_t x) {
-
+  
   esl_neon_128f_t one, e, tmp, z, y, inf_vector, neginf_vector;
   esl_neon_128i_t nan_mask, emm0, ux, mask;
   esl_neon_128i_t poszero_mask, inf_mask; /* Special IEEE754 inputs */
@@ -271,7 +271,6 @@ esl_neon_dump_float(FILE *fp, esl_neon_128f_t v)
   float *p = (float *)&v;
   fprintf(fp, "[%13.8g, %13.8g, %13.8g, %13.8g]", p[0], p[1], p[2], p[3]);
 }
-
 
 
 
